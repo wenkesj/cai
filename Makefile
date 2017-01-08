@@ -1,8 +1,8 @@
-CC = gcc
+CC ?= gcc
 CFLAGS = -fPIC -Wall -Wextra -O2 -g
 LDFLAGS = -shared
 RM = rm -f
-TARGET_LIB = libweakai.so
+TARGET_LIB = libweakai.dylib weakai.o
 SRC_PATH = .
 SRCS = $(shell find $(SRC_PATH) -name '*.c' | sort -k 1nr | cut -f2-)
 OBJS = $(SRCS:.c=.o)
