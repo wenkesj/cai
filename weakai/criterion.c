@@ -47,22 +47,30 @@ criterion *criterion_create(
   }
   c->criterion_output = criterion_output;
   c->criterion_gradient = criterion_gradient;
+  c->output = NULL;
+  c->gradient = NULL;
   return c;
 }
 
 /*
- * criterion_forward
+ * criterion_forward calculates the 1d-loss
  */
 matrix *criterion_forward(criterion *c, matrix *output, matrix *target) {
-  c->output = c->criterion_output(output, target);
+  if (c->output == NULL) {
+    c->output = malloc(sizeof(*output));
+  }
+  *c->output = *c->criterion_output(output, target);
   return matrix_copy(c->output);
 }
 
 /*
- * criterion_backward
+ * criterion_backward calculates the gradient w.r.t the output
  */
 matrix *criterion_backward(criterion *c, matrix *output, matrix *target) {
-  c->gradient = c->criterion_gradient(output, target);
+  if (c->gradient == NULL) {
+    c->gradient = malloc(sizeof(*output));
+  }
+  *c->gradient = *c->criterion_gradient(output, target);
   return matrix_copy(c->gradient);
 }
 
@@ -100,7 +108,7 @@ matrix *criterion_backward_bce(matrix *output, matrix *target) {
 }
 
 /*
- * criterion_forward_mse
+ * criterion_forward_mse, calculate the mse loss
  */
 matrix *criterion_forward_mse(matrix *output, matrix *target) {
   int i, j;
@@ -112,7 +120,7 @@ matrix *criterion_forward_mse(matrix *output, matrix *target) {
       sum += error * error;
     }
   }
-  c->data[0][0] = sum / ((float)output->rows);
+  c->data[0][0] = sum / (float)output->rows;
   return c;
 }
 

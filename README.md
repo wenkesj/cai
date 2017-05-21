@@ -1,3 +1,7 @@
 # weakai
 
-Inspired by @unixpickle's [weakai](https://github.com/unixpickle/weakai), this is where I will document my experience with various "weak" AI and the topic of machine learning.
+[] rename networks as modules
+[] refactor layers into recursive modules
+[] create library for basic algorithms
+  [] criterions
+  [] layers

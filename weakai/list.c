@@ -46,7 +46,7 @@ list *list_create() {
 }
 
 /*
- * list_add
+ * list_add queues the a node with the value to the list.
  */
 list *list_add(list *l, void *value) {
   list_node *n;
@@ -59,10 +59,17 @@ list *list_add(list *l, void *value) {
     l->head = l->tail = n;
     n->previous = n->next = NULL;
   } else {
-    n->previous = NULL;
-    n->next = l->head;
-    l->head->previous = n;
-    l->head = n;
+    // enqueue
+    l->tail->next = n;
+    n->previous = l->tail;
+    l->tail = n;
+    n->next = NULL;
+
+    // push
+    // n->previous = NULL;
+    // n->next = l->head;
+    // l->head->previous = n;
+    // l->head = n;
   }
   l->length++;
   return l;

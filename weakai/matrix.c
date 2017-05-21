@@ -32,21 +32,28 @@
 #include <stdio.h>
 
 /*
- * matrix_zeros
+ * matrix_zeros, used as an initialize_function, fills a matrix with zeros.
  */
 float matrix_zeros(int i, int j) {
   return 0.0;
 }
 
 /*
- * matrix_ones
+ * matrix_ones, used as an initialize_function, fills a matrix with ones.
  */
 float matrix_ones(int i, int j) {
   return 1.0;
 }
 
 /*
- * matrix_create
+ * matrix_random, used as an initialize_function, fills a matrix with random (0, 1).
+ */
+float matrix_random(int i, int j) {
+  return (float)rand()/(float)(RAND_MAX);
+}
+
+/*
+ * matrix_create returns a new matrix.
  */
 matrix *matrix_create(int rows, int columns, float (*initialize_function)(int, int)) {
   matrix *m;
@@ -73,7 +80,7 @@ matrix *matrix_create(int rows, int columns, float (*initialize_function)(int, i
 }
 
 /*
- * matrix_multiply
+ * matrix_multiply returns a product matrix of a and b.
  */
 matrix *matrix_multiply(matrix *a, matrix *b) {
   int i, j, k;
@@ -91,7 +98,7 @@ matrix *matrix_multiply(matrix *a, matrix *b) {
 }
 
 /*
- * matrix_add
+ * matrix_add returns a additive matrix of a and b.
  */
 matrix *matrix_add(matrix *a, matrix *b) {
   int i, j;
@@ -105,7 +112,7 @@ matrix *matrix_add(matrix *a, matrix *b) {
 }
 
 /*
- * matrix_scale
+ * matrix_scale returns a scaled matrix of a.
  */
 matrix *matrix_scale(matrix *a, float b) {
   int i, j;
@@ -119,7 +126,7 @@ matrix *matrix_scale(matrix *a, float b) {
 }
 
 /*
- * matrix_transpose
+ * matrix_transpose returns a transpose matrix of m.
  */
 matrix *matrix_transpose(matrix *m) {
   int i, j;
@@ -133,7 +140,7 @@ matrix *matrix_transpose(matrix *m) {
 }
 
 /*
- * matrix_copy
+ * matrix_copy returns a deep copy of m.
  */
 matrix *matrix_copy(matrix *m) {
   matrix *copy;
@@ -156,26 +163,28 @@ matrix *matrix_copy(matrix *m) {
 }
 
 /*
- * matrix_string
+ * matrix_print prints matrix to stdout, lazy
  */
-char *matrix_string(matrix *m) {
+void matrix_print(char *name, matrix *input) {
   int i, j;
-  char *buffer = malloc(2 * m->columns * m->rows * sizeof(char));
-  for (i = 0; i < m->rows; i++) {
-    for (j = 0; j < m->columns; j++) {
-      sprintf(buffer, j != m->columns - 1 ? "%f\t" : "%f\n", m->data[i][j]);
+  printf("%s (%d, %d)\n", name, input->rows, input->columns);
+  for (i = 0; i < input->rows; i++) {
+    for (j = 0; j < input->columns; j++) {
+      printf("%f ", input->data[i][j]);
     }
+    printf("\n");
   }
-  return buffer;
 }
 
 /*
  * matrix_free
  */
 void matrix_free(matrix *m) {
-  if (m != NULL) {
-    free(m->data);
-    free(m);
-    m = NULL;
+  int i;
+  for (i = 0; i < m->rows; i++) {
+    free(m->data[i]);
   }
+  free(m->data);
+  free(m);
+  m = NULL;
 }

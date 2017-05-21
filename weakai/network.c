@@ -64,27 +64,54 @@ matrix *network_forward(network *n, matrix *input) {
   matrix *outputs = matrix_copy(input);
   list_for_each (n->layers, layer_node) {
     layer *l = (layer *)layer_node->value;
-    outputs = layer_forward(l, outputs);
+    *outputs = *layer_forward(l, outputs);
   }
-  return matrix_copy(((layer *)n->layers->tail->value)->output);
+
+  matrix *outputs_copy = matrix_copy(outputs);
+  matrix_free(outputs);
+  return outputs_copy;
 }
 
 /*
- * network_backward
+ * network_backward, two-pass
  */
 matrix *network_backward(network *n, matrix *input, matrix *gradient) {
   list_node *layer_node;
   matrix *gradient_update = matrix_copy(gradient);
-  matrix *input_update = matrix_copy(input);
+  matrix *output;
+
+  // Update gradients
   list_for_each_reverse (n->layers, layer_node) {
     layer *l = (layer *)layer_node->value;
-    gradient_update = layer_backward(l, input_update, gradient_update);
-    if (l->update != NULL) {
-      layer_update(l, input_update, gradient_update, 1);
+    if (layer_node->previous != NULL) {
+      layer *pl = (layer *)layer_node->previous->value;
+      output = pl->output;
+    } else {
+      output = input;
     }
-    input_update = matrix_copy(l->output);
+
+    // previous layers output as input
+    *gradient_update = *layer_backward(l, output, gradient_update);
   }
-  return matrix_copy(((layer *)n->layers->head->value)->gradient);
+  *gradient_update = *gradient;
+
+  // Update gradient weights
+  list_for_each_reverse (n->layers, layer_node) {
+    layer *l = (layer *)layer_node->value;
+    if (layer_node->previous != NULL) {
+      layer *pl = (layer *)layer_node->previous->value;
+      output = pl->output;
+    } else {
+      output = input;
+    }
+
+    if (l->update != NULL) {
+      layer_update(l, output, gradient_update, 1);
+    }
+    *gradient_update = *l->gradient;
+  }
+
+  return gradient_update;
 }
 
 /*
@@ -94,13 +121,12 @@ network *network_update(network *n, float learning_rate) {
   list_node *layer_node;
   list_for_each (n->layers, layer_node) {
     layer *l = (layer *)layer_node->value;
-    if (l->weights && l->update) {
-      int i, j;
-      for (i = 0; i < l->weights->rows; i++) {
-        for (j = 0; j < l->weights->columns; j++) {
-          l->weights->data[i][j] += -learning_rate * l->gradient_weights->data[i][j];
-        }
-      }
+    if (l->weights != NULL) {
+      matrix_print("w", l->gradient_weights);
+      matrix *scaled_weights = matrix_scale(l->gradient_weights, -learning_rate);
+      matrix_print("sw", scaled_weights);
+      *l->weights = *matrix_add(l->weights, scaled_weights);
+      matrix_free(scaled_weights);
     }
   }
   return n;
@@ -113,12 +139,12 @@ void network_gradient_zero(network *n) {
   list_node *layer_node;
   list_for_each (n->layers, layer_node) {
     layer *l = (layer *)layer_node->value;
-    if (l->gradient_weights) {
-      free(l->gradient_weights);
-      l->gradient_weights = matrix_create(l->gradient_weights->rows, l->gradient_weights->columns, &matrix_zeros);
+    if (l->gradient_weights != NULL) {
+      *l->gradient_weights = *matrix_create(l->gradient_weights->rows, l->gradient_weights->columns, &matrix_zeros);
     }
-    free(l->gradient);
-    l->gradient = matrix_create(l->gradient->rows, l->gradient->columns, &matrix_zeros);
+    if (l->gradient != NULL) {
+      *l->gradient = *matrix_create(l->gradient->rows, l->gradient->columns, &matrix_zeros);
+    }
   }
 }
 

@@ -53,38 +53,38 @@ layer *layer_create(
     &layer_forward_none : forward;
   l->backward = backward == NULL ?
     &layer_backward_none : backward;
-  l->output = matrix_create(1, output, NULL);
-  l->gradient = matrix_create(1, output, NULL);
+  l->output = matrix_create(output, 1, NULL);
+  l->gradient = matrix_create(output, 1, NULL);
   l->weights = update == NULL ?
-    NULL : matrix_create(input, output, parameter_function == NULL ?
+    NULL : matrix_create(output, input, parameter_function == NULL ?
       &matrix_zeros : parameter_function);
   l->gradient_weights = update == NULL ?
-    NULL : matrix_create(input, output, &matrix_zeros);
+    NULL : matrix_create(output, input, &matrix_zeros);
   l->update = update;
   return l;
 }
 
 /*
- * layer_forward
+ * layer_forward, f(x)
  */
-matrix *layer_forward(layer *l, matrix *m) {
-  l->output = l->forward(l, m);
+matrix *layer_forward(layer *l, matrix *input) {
+  *l->output = *l->forward(l, input);
   return matrix_copy(l->output);
 }
 
 /*
- * layer_backward
+ * layer_backward, δ = δE * f'(x)
  */
 matrix *layer_backward(layer *l, matrix *input, matrix *gradient) {
-  l->gradient = l->backward(l, input, gradient);
+  *l->gradient = *l->backward(l, input, gradient);
   return matrix_copy(l->gradient);
 }
 
 /*
- * layer_update
+ * layer_update,
  */
-matrix *layer_update(layer *l, matrix *input, matrix *gradient, float learning_rate) {
-  l->gradient_weights = l->update(l, input, gradient, learning_rate);
+matrix *layer_update(layer *l, matrix *input, matrix *gradient, float scale) {
+  *l->gradient_weights = *l->update(l, input, gradient, scale);
   return matrix_copy(l->gradient_weights);
 }
 
@@ -93,12 +93,13 @@ matrix *layer_update(layer *l, matrix *input, matrix *gradient, float learning_r
  */
 matrix *layer_forward_sigmoid(layer *l, matrix *input) {
   int i, j;
+  matrix *output = matrix_create(input->rows, input->columns, NULL);
   for (i = 0; i < input->rows; i++) {
     for (j = 0; j < input->columns; j++) {
-      input->data[i][j] = 1 / (1 + exp(-input->data[i][j]));
+      output->data[i][j] = 1 / (1 + exp(-input->data[i][j]));
     }
   }
-  return input;
+  return output;
 }
 
 /*
@@ -119,51 +120,49 @@ matrix *layer_backward_sigmoid(layer *l, matrix *output, matrix *gradient) {
  * layer_forward_linear
  */
 matrix *layer_forward_linear(layer *l, matrix *input) {
-  return matrix_multiply(input, matrix_transpose(l->weights));
+  return matrix_multiply(l->weights, input);
 }
 
 /*
  * layer_backward_linear
  */
 matrix *layer_backward_linear(layer *l, matrix *output, matrix *gradient) {
-  return matrix_multiply(gradient, l->weights);
+  matrix *wt = matrix_transpose(l->weights);
+  matrix *g = matrix_multiply(wt, gradient);
+  matrix_free(wt);
+  return g;
 }
 
 /*
  * layer_update_linear
  */
-matrix *layer_update_linear(layer *l, matrix *input, matrix *gradient, float learning_rate) {
+matrix *layer_update_linear(layer *l, matrix *input, matrix *gradient, float scale) {
   int i, j;
   matrix *gradient_weights = matrix_copy(l->gradient_weights);
-  if (gradient_weights->rows != input->columns ||
-      gradient_weights->columns != gradient->columns) {
-    perror("Gradient/input dimensions don't match weights\n");
-    return NULL;
-  }
   for (i = 0; i < l->gradient_weights->rows; i++) {
     for (j = 0; j < l->gradient_weights->columns; j++) {
-      gradient_weights->data[i][j] += (learning_rate * input->data[0][j] * gradient->data[0][i]);
+      gradient_weights->data[i][j] += (scale * input->data[j][0] * gradient->data[i][0]);
     }
   }
   return gradient_weights;
 }
 
 /*
- * layer_forward_tanh
+ * layer_forward_tanh, x[i] = f(x[i-1])
  */
-matrix *layer_forward_tanh(layer *l, matrix *output) {
+matrix *layer_forward_tanh(layer *l, matrix *input) {
   int i, j;
-  matrix *layer_output = matrix_copy(output);
+  matrix *layer_output = matrix_create(input->rows, input->columns, NULL);
   for (i = 0; i < layer_output->rows; i++) {
     for (j = 0; j < layer_output->columns; j++) {
-      layer_output->data[i][j] = (float)tanh((double)layer_output->data[i][j]);
+      layer_output->data[i][j] = (float)tanh((double)input->data[i][j]);
     }
   }
   return layer_output;
 }
 
 /*
- * layer_backward_tanh
+ * layer_backward_tanh, f'(o)
  */
 matrix *layer_backward_tanh(layer *l, matrix *output, matrix *gradient) {
   int i, j;
@@ -194,7 +193,7 @@ matrix *layer_backward_none(layer *l, matrix *output, matrix *gradient) {
  * layer_random
  */
 float layer_random(int i, int j) {
-  return (float)rand()/(float)(RAND_MAX);
+  return (2 * ((float)rand()/(float)(RAND_MAX))) - 1;
 }
 
 /*
