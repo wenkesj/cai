@@ -1,4 +1,5 @@
-/**/*.d
-/**/*.o
-/**/*.so
-/**/*.dylib
+*.d
+*.o
+*.so
+*.dylib
+.DS_Store

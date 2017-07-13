@@ -1,32 +1,3 @@
-/*
- * Copyright (c) 2016-2017, Sam Wenke <samwenke at gmail dot com>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- *   * Redistributions of source code must retain the above copyright notice,
- *     this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
- *   * Neither the name of Sam Wenke nor the names of its contributors may be used
- *     to endorse or promote products derived from this software without
- *     specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- */
-
 #include "layer.h"
 #include "matrix.h"
 #include <math.h>
@@ -58,14 +29,19 @@ layer *layer_create(
   l->weights = update == NULL ?
     NULL : matrix_create(output, input, parameter_function == NULL ?
       &matrix_zeros : parameter_function);
+  l->biases = update == NULL ?
+    NULL : matrix_create(output, 1, parameter_function == NULL ?
+      &matrix_zeros : parameter_function);
   l->gradient_weights = update == NULL ?
     NULL : matrix_create(output, input, &matrix_zeros);
+  l->gradient_biases = update == NULL ?
+    NULL : matrix_create(output, 1, &matrix_zeros);
   l->update = update;
   return l;
 }
 
 /*
- * layer_forward, f(x)
+ * layer_forward
  */
 matrix *layer_forward(layer *l, matrix *input) {
   *l->output = *l->forward(l, input);
@@ -73,7 +49,7 @@ matrix *layer_forward(layer *l, matrix *input) {
 }
 
 /*
- * layer_backward, δ = δE * f'(x)
+ * layer_backward
  */
 matrix *layer_backward(layer *l, matrix *input, matrix *gradient) {
   *l->gradient = *l->backward(l, input, gradient);
@@ -81,7 +57,7 @@ matrix *layer_backward(layer *l, matrix *input, matrix *gradient) {
 }
 
 /*
- * layer_update,
+ * layer_update
  */
 matrix *layer_update(layer *l, matrix *input, matrix *gradient, float scale) {
   *l->gradient_weights = *l->update(l, input, gradient, scale);
@@ -120,7 +96,10 @@ matrix *layer_backward_sigmoid(layer *l, matrix *output, matrix *gradient) {
  * layer_forward_linear
  */
 matrix *layer_forward_linear(layer *l, matrix *input) {
-  return matrix_multiply(l->weights, input);
+  matrix *res = matrix_multiply(l->weights, input);
+  matrix *output = matrix_add(res, l->biases);
+  matrix_free(res);
+  return output;
 }
 
 /*
@@ -139,16 +118,18 @@ matrix *layer_backward_linear(layer *l, matrix *output, matrix *gradient) {
 matrix *layer_update_linear(layer *l, matrix *input, matrix *gradient, float scale) {
   int i, j;
   matrix *gradient_weights = matrix_copy(l->gradient_weights);
+  matrix *gradient_biases = matrix_copy(l->gradient_biases);
   for (i = 0; i < l->gradient_weights->rows; i++) {
     for (j = 0; j < l->gradient_weights->columns; j++) {
-      gradient_weights->data[i][j] += (scale * input->data[j][0] * gradient->data[i][0]);
+      gradient_weights->data[i][j] += (scale * gradient->data[i][0] * input->data[j][0]);
     }
   }
+  *l->gradient_biases = *matrix_add(l->gradient_biases, matrix_scale(gradient, scale));
   return gradient_weights;
 }
 
 /*
- * layer_forward_tanh, x[i] = f(x[i-1])
+ * layer_forward_tanh
  */
 matrix *layer_forward_tanh(layer *l, matrix *input) {
   int i, j;
@@ -162,7 +143,7 @@ matrix *layer_forward_tanh(layer *l, matrix *input) {
 }
 
 /*
- * layer_backward_tanh, f'(o)
+ * layer_backward_tanh
  */
 matrix *layer_backward_tanh(layer *l, matrix *output, matrix *gradient) {
   int i, j;
@@ -193,7 +174,14 @@ matrix *layer_backward_none(layer *l, matrix *output, matrix *gradient) {
  * layer_random
  */
 float layer_random(int i, int j) {
-  return (2 * ((float)rand()/(float)(RAND_MAX))) - 1;
+  return  ((2 * ((float)rand()/(float)(RAND_MAX))) - 1);
+}
+
+/*
+ * layer_ones
+ */
+float layer_ones(int i, int j) {
+  return 1.0;
 }
 
 /*
